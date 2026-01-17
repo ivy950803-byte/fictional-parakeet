@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>護理臨床全能計算模擬器</title>
+<style>
+:root {
+--primary: #2c3e50;
+--accent: #3498db;
+--danger: #e74c3c;
+--success: #27ae60;
+--bg: #f4f7f6;
+}
+body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); margin: 0; padding-top: 110px; padding-bottom: 40px; }
+
+/* 頂部固定目錄 */
+nav { position: fixed; top: 0; left: 0; width: 100%; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1000; padding: 10px 0; }
+.nav-container { display: flex; overflow-x: auto; padding: 5px 15px; gap: 10px; -webkit-overflow-scrolling: touch; }
+.nav-container::-webkit-scrollbar { display: none; }
+nav a { background: #fff; border: 1.5px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 20px; text-decoration: none; white-space: nowrap; font-size: 14px; font-weight: bold; }
+nav a:active { background: var(--accent); color: white; }
+
+.container { max-width: 600px; margin: auto; padding: 0 15px; }
+.card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 25px; scroll-margin-top: 120px; }
+h2 { margin: 0 0 15px 0; font-size: 1.2rem; color: var(--primary); border-left: 5px solid var(--accent); padding-left: 10px; }
+
+.row { display: flex; gap: 10px; margin-bottom: 12px; }
+.col { flex: 1; }
+label { display: block; font-size: 0.85rem; color: #666; margin-bottom: 5px; }
+input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; background: #fff; }
+
+/* 燒傷點選網格 */
+.burn-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 15px 0; }
+.burn-part { padding: 10px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px; text-align: center; cursor: pointer; font-size: 0.85rem; }
+.burn-part.selected { background: var(--danger); color: white; border-color: #c0392b; font-weight: bold; }
+
+.result { margin-top: 15px; padding: 15px; background: #ebf5fb; border-left: 5px solid var(--accent); border-radius: 4px; color: #333; font-weight: bold; line-height: 1.6; }
+.result b { color: var(--danger); font-size: 1.1rem; }
+
+.warning { font-size: 0.8rem; color: #95a5a6; text-align: center; margin: 30px 0; line-height: 1.5; }
+html { scroll-behavior: smooth; }
+</style>
+</head>
+<body>
+
+<nav>
+<div class="nav-container">
+<a href="#burn-section">🔥 燒傷面積</a>
+<a href="#iv-section">💧 點滴流速</a>
+<a href="#drug-section">💊 藥物/鈣</a>
+<a href="#basic-section">⚖️ BMI/MAP</a>
+<a href="#renal-section">🧪 腎功能</a>
+<a href="#gcs-section">🧠 GCS 評分</a>
+<a href="#ob-section">👶 預產期</a>
+</div>
+</nav>
+
+<div class="container">
+
+<section id="burn-section" class="card">
+<h2>點選式燒燙傷 (Rule of Nines)</h2>
+<p style="font-size: 0.8rem; color: #7f8c8d;">點選受傷部位，系統將自動累加 TBSA：</p>
+<div class="burn-grid">
+<div class="burn-part" data-val="9" onclick="toggleBurn(this)">頭頸部 (9%)</div>
+<div class="burn-part" data-val="1" onclick="toggleBurn(this)">生殖部位 (1%)</div>
+<div class="burn-part" data-val="9" onclick="toggleBurn(this)">軀幹前-上 (9%)</div>
+<div class="burn-part" data-val="9" onclick="toggleBurn(this)">軀幹前-下 (9%)</div>
+<div class="burn-part" data-val="9" onclick="toggleBurn(this)">軀幹後-上 (9%)</div>
+<div class="burn-part" data-val="9" onclick="toggleBurn(this)">軀幹後-下 (9%)</div>
+<div class="burn-part" data-val="4.5" onclick="toggleBurn(this)">左手前側 (4.5%)</div>
+<div class="burn-part" data-val="4.5" onclick="toggleBurn(this)">左手後側 (4.5%)</div>
+<div class="burn-part" data-val="4.5" onclick="toggleBurn(this)">右手前側 (4.5%)</div>
+<div class="burn-part" data-val="4.5" onclick="toggleBurn(this)">右手後側 (4.5%)</div>
+<div class="burn-part" data-val="9" onclick="toggleBurn(this)">左腳前側 (9%)</div>
+<div class="burn-part" data-val="9" onclick="toggleBurn(this)">左腳後側 (9%)</div>
+<div class="burn-part" data-val="9" onclick="toggleBurn(this)">右腳前側 (9%)</div>
+<div class="burn-part" data-val="9" onclick="toggleBurn(this)">右腳後側 (9%)</div>
+</div>
+<div class="row">
+<div class="col"><label>體重 (kg)</label><input type="number" id="burnW" placeholder="計算補液用" oninput="calcParkland()"></div>
+<div class="col"><label>當前 TBSA %</label><input type="number" id="burnP" readonly></div>
+</div>
+<div id="burnRes" class="result">請點選部位並輸入體重...</div>
+</section>
+
+
+<section id="iv-section" class="card">
+<h2>IV 點滴流速計算</h2>
+<div class="row">
+<div class="col"><label>總量 (ml)</label><input type="number" id="ivV" oninput="calcIV()"></div>
+<div class="col"><label>時間 (hr)</label><input type="number" id="ivH" oninput="calcIV()"></div>
+</div>
+<label>滴係數 (gtt/ml)</label>
+<select id="ivF" onchange="calcIV()">
+<option value="20">20 (普通輸液套)</option>
+<option value="15">15 (普通輸液套)</option>
+<option value="60">60 (精密微量套)</option>
+</select>
+<div id="ivRes" class="result">結果顯示處...</div>
+</section>
+
+<section id="drug-section" class="card">
+<h2>藥物劑量與校正鈣</h2>
+<div style="border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
+<label>醫囑劑量 (mg) / 現有劑量 (mg) / 體積 (ml)</label>
+<div class="row">
+<input type="number" id="dO" placeholder="Order" oninput="calcMed()">
+<input type="number" id="dH" placeholder="Have" oninput="calcMed()">
+<input type="number" id="dV" placeholder="ml" oninput="calcMed()">
+</div>
+<div id="medRes" style="color: var(--accent); font-weight: bold; font-size: 0.9rem;">應抽: -- ml</div>
+</div>
+<div>
+<label>校正鈣 (Albumin < 4.0 時使用)</label>
+<div class="row">
+<input type="number" id="cCa" step="0.1" placeholder="Ca (mg/dL)" oninput="calcCorrCa()">
+<input type="number" id="cAlb" step="0.1" placeholder="Alb (g/dL)" oninput="calcCorrCa()">
+</div>
+<div id="caRes" style="color: var(--accent); font-weight: bold; font-size: 0.9rem;">校正值: -- mg/dL</div>
+</div>
+</section>
+
+<section id="basic-section" class="card">
+<h2>BMI 與 MAP 計算</h2>
+<div class="row">
+<div class="col"><label>身高 (cm)</label><input type="number" id="h" oninput="calcBasic()"></div>
+<div class="col"><label>體重 (kg)</label><input type="number" id="w" oninput="calcBasic()"></div>
+</div>
+<div class="row">
+<div class="col"><label>收縮壓 (SBP)</label><input type="number" id="sbp" oninput="calcBasic()"></div>
+<div class="col"><label>舒張壓 (DBP)</label><input type="number" id="dbp" oninput="calcBasic()"></div>
+</div>
+<div id="basicRes" class="result">結果顯示處...</div>
+</section>
+
+<section id="renal-section" class="card">
+<h2>腎功能評估</h2>
+<div class="row">
+<div class="col"><label>年齡</label><input type="number" id="rA" oninput="calcRenal()"></div>
+<div class="col"><label>Cr (mg/dL)</label><input type="number" id="rC" step="0.1" oninput="calcRenal()"></div>
+<div class="col"><label>性別</label>
+<select id="rS" onchange="calcRenal()"><option value="1">男</option><option value="0.85">女</option></select>
+</div>
+</div>
+<div id="renalRes" class="result">eGFR: -- ml/min</div>
+</section>
+
+<section id="gcs-section" class="card">
+<h2>GCS 昏迷指數評估</h2>
+<label>E (睜眼)</label>
+<select id="gE" onchange="calcGCS()"><option value="4">4-自動睜眼</option><option value="3">3-聽從呼喚</option><option value="2">2-受痛睜眼</option><option value="1">1-無反應</option></select>
+<label>V (口語)</label>
+<select id="gV" onchange="calcGCS()"><option value="5">5-定向力好</option><option value="4">4-言談迷糊</option><option value="3">3-言不及義</option><option value="2">2-發出怪聲</option><option value="1">1-無反應</option></select>
+<label>M (動作)</label>
+<select id="gM" onchange="calcGCS()"><option value="6">6-遵從動作</option><option value="5">5-受痛定位</option><option value="4">4-受痛縮回</option><option value="3">3-痛覺異常屈曲</option><option value="2">2-痛覺異常伸展</option><option value="1">1-無反應</option></select>
+<div id="gcsRes" class="result">總分: E4V5M6 (15分)</div>
+</section>
+
+<section id="ob-section" class="card">
+<h2>EDC 預產期計算</h2>
+<label>最後一次月經第一天 (LMP)</label>
+<input type="date" id="lmp" onchange="calcEDC()">
+<div id="edcRes" class="result">預產期: --</div>
+</section>
+
+<p class="warning">⚠️ <b>免責聲明：</b><br>本工具計算結果僅供臨床參考。任何醫療決策應依醫囑為準，並經由兩名合格醫護人員核對。作者不承擔任何因使用本工具產生的醫療風險。</p>
+</div>
+
+<script>
+let tbsa = 0;
+function toggleBurn(el) {
+let val = parseFloat(el.getAttribute('data-val'));
+el.classList.toggle('selected');
+tbsa += el.classList.contains('selected') ? val : -val;
+document.getElementById('burnP').value = tbsa;
+calcParkland();
+}
+
+function calcParkland() {
+let w = document.getElementById('burnW').value;
+let p = tbsa;
+let res = document.getElementById('burnRes');
+if(w > 0 && p > 0) {
+let total = 4 * w * p;
+res.innerHTML = `24h 補液總量: <b>${total} ml</b><br>前 8h: ${total/2} ml (${(total/16).toFixed(0)} gtt/min@20gtt)<br>後 16h: ${total/2} ml`;
+} else { res.innerText = "請選取部位並輸入體重"; }
+}
+
+function calcIV() {
+let v = document.getElementById('ivV').value;
+let h = document.getElementById('ivH').value;
+let f = document.getElementById('ivF').value;
+if(v && h) {
+let g = Math.round((v*f)/(h*60));
+document.getElementById('ivRes').innerHTML = `滴速: <b>${g} gtt/min</b><br>流速: ${(v/h).toFixed(1)} ml/hr`;
+}
+}
+
+function calcMed() {
+let o = document.getElementById('dO').value;
+let h = document.getElementById('dH').value;
+let v = document.getElementById('dV').value;
+if(o && h && v) document.getElementById('medRes').innerText = `應抽: ${((o/h)*v).toFixed(2)} ml`;
+}
+
+function calcCorrCa() {
+let ca = parseFloat(document.getElementById('cCa').value);
+let alb = parseFloat(document.getElementById('cAlb').value);
+if(ca && alb) document.getElementById('caRes').innerText = `校正值: ${(ca + 0.8*(4-alb)).toFixed(2)} mg/dL`;
+}
+
+function calcBasic() {
+let height = document.getElementById('h').value / 100;
+let weight = document.getElementById('w').value;
+let sbp = parseFloat(document.getElementById('sbp').value);
+let dbp = parseFloat(document.getElementById('dbp').value);
+let out = "";
+if(height && weight) out += `BMI: ${(weight/(height*height)).toFixed(1)}<br>`;
+if(sbp && dbp) out += `MAP: ${((sbp + 2*dbp)/3).toFixed(1)} mmHg`;
+document.getElementById('basicRes').innerHTML = out || "等待輸入...";
+}
+
+function calcRenal() {
+let a = document.getElementById('rA').value;
+let c = document.getElementById('rC').value;
+let w = document.getElementById('w').value;
+let s = document.getElementById('rS').value;
+if(a && c && w) document.getElementById('renalRes').innerText = `eGFR: ${(((140-a)*w)/(72*c)*s).toFixed(1)} ml/min`;
+}
+
+function calcGCS() {
+let e = document.getElementById('gE').value;
+let v = document.getElementById('gV').value;
+let m = document.getElementById('gM').value;
+document.getElementById('gcsRes').innerText = `總分: E${e}V${v}M${m} (${parseInt(e)+parseInt(v)+parseInt(m)}分)`;
+}
+
+function calcEDC() {
+let l = new Date(document.getElementById('lmp').value);
+if(!isNaN(l)) {
+l.setMonth(l.getMonth() + 9);
+l.setDate(l.getDate() + 7);
+document.getElementById('edcRes').innerText = `預產期: ${l.getFullYear()}/${l.getMonth()+1}/${l.getDate()}`;
+}
+}
+</script>
+</body>
+</html>
